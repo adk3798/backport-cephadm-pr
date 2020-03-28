@@ -1,8 +1,32 @@
+"""
+Simple workflow for backporting Ceph PRs
+
+Usage:
+  simple-backport-pr.py options <pr_id>
+  simple-backport-pr.py -h | --help
+
+Options:
+  --ignore-pr-not-merged
+  --ignore-tracker
+  -h --help                Show this screen.
+"""
 from subprocess import check_call, check_output, CalledProcessError
 import os
 import sys
 
 from github import Github, Repository, PullRequest, PaginatedList, GitCommit, Commit, Milestone
+import docopt
+
+check_pr_not_merged = 'pr-not-merged'
+check_tracker = 'tracker'
+
+def _check(condition, name, description):
+    if condition:
+        if name in disabled_checks:
+            print(f'ignoring check failed: {description} [--ignore-{name}]')
+        else:
+            print(f'check failed: {description} [--ignore-{name}]')
+            sys.exit(3)
 
 
 def backport_commits(branch_name, commits):
@@ -18,23 +42,23 @@ def backport_commits(branch_name, commits):
     check_call(f"git push --set-upstream origin octopus-{branch_name}", shell=True)
 
 
-def get_pr(pr_id) -> PullRequest:
+def get_pr(ceph, pr_id) -> PullRequest:
     pr: PullRequest = ceph.get_pull(int(pr_id))
-    if not pr.merged:
-        print('PR not merged: {pr.html_url}')
-        sys.exit(3)
-    if 'https://tracker.ceph.com/issues/' in pr.body:
-        print(f'looks like pr contains a link to the tracker {pr.html_url}')
-        sys.exit(3)
+    _check(not pr.merged,
+           check_pr_not_merged,
+           f'PR not merged: {pr.html_url}')
+    _check('https://tracker.ceph.com/issues/' in pr.body,
+           check_tracker,
+           f'looks like pr contains a link to the tracker {pr.html_url}')
     return pr
 
 
 def get_pr_commits(pr: PullRequest) -> PaginatedList:
     cs = pr.get_commits()
     for c in cs:
-        if 'https://tracker.ceph.com/issues/' in c.commit.message:
-            print(f'looks like {c} of {pr} contains a link to the tracker')
-            sys.exit(3)
+        _check('https://tracker.ceph.com/issues/' in c.commit.message,
+               check_tracker,
+               f'looks like {c} of {pr} contains a link to the tracker')
 
     c_ids = list(c.sha for c in cs)
     print(c_ids)
@@ -96,9 +120,7 @@ def get_pr_labels(pr: PullRequest):
     return [l for l in 'cephadm orchestrator mgr'.split() if l in labels]
 
 
-if __name__ == '__main__':
-    pr_id = sys.argv[1]
-
+def main(pr_id):
     with open(f"{os.environ['HOME']}/.github_token") as f:
         token = f.read().strip()
 
@@ -106,7 +128,7 @@ if __name__ == '__main__':
     ceph: Repository = g.get_repo('ceph/ceph')
     octopus_milestone: Milestone = ceph.get_milestone(13)
 
-    pr = get_pr(pr_id)
+    pr = get_pr(ceph, pr_id)
 
     commits = get_pr_commits(pr)
 
@@ -115,5 +137,14 @@ if __name__ == '__main__':
     backport_commits(f'backport-{pr_id}', ' '.join(c.sha for c in commits))
     create_backport_pull_request(ceph, octopus_milestone, pr)
 
-    
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+
+    disabled_checks = set()
+    if args['--ignore-pr-not-merged']:
+        disabled_checks.add(check_pr_not_merged)
+    if args['--ignore-tracker']:
+        disabled_checks.add(check_tracker)
+
+    main(args['<pr_id>'])
 
