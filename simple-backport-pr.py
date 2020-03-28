@@ -86,9 +86,14 @@ Original description:
         base='octopus',
         head=f'sebastian-philipp:octopus-backport-{pr_id}',
     )
-    backport_pr.set_labels('cephadm')
+    backport_pr.set_labels(*get_pr_labels(pr))
     backport_pr.as_issue().edit(milestone=milestone,)
     print(f'Backport PR creted: {backport_pr.html_url}')
+
+
+def get_pr_labels(pr: PullRequest):
+    labels = [l.name for l in pr.labels]
+    return [l for l in 'cephadm orchestrator mgr'.split() if l in labels]
 
 
 if __name__ == '__main__':
@@ -104,7 +109,7 @@ if __name__ == '__main__':
     pr = get_pr(pr_id)
 
     commits = get_pr_commits(pr)
-    
+
     for c in commits:
         commit_in_current_branch(c)
     backport_commits(f'backport-{pr_id}', ' '.join(c.sha for c in commits))
