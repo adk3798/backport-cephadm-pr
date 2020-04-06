@@ -59,7 +59,7 @@ class GHCache:
         return self._content['commits']
 
     @property
-    def pr_commits(self) -> Dict[int, List[str]]:
+    def pr_commits(self) -> Dict[str, List[str]]:
         if 'pr_commits' not in self._content:
             self._content['pr_commits'] = {}
 
@@ -91,11 +91,11 @@ class CachedCommit(NamedTuple):
 
     @classmethod
     def from_cache(cls, sha) -> "CachedCommit":
-        d = gh_cache.prs[sha]
+        d = gh_cache.commits[sha].copy()
         return cls(**d)
 
     def save(self):
-        gh_cache.commits[self.sha] = self._asdict()
+        gh_cache.commits[self.sha] = self._asdict().copy()
         gh_cache.save()
 
 
@@ -126,7 +126,7 @@ class CachedPr(NamedTuple):
 
     @classmethod
     def from_cache(cls, number: int, ceph: Repository) -> "CachedPr":
-        d = gh_cache.prs[str(number)]
+        d = gh_cache.prs[str(number)].copy()
         d['merged_at'] = parser.isoparse(d['merged_at'])
         d['ceph'] = ceph
         if 'html_url' not in d:
@@ -134,22 +134,22 @@ class CachedPr(NamedTuple):
         return cls(**d)
 
     def save(self):
-        d = self._asdict()
+        d = self._asdict().copy()
         del d['ceph']
         d['merged_at'] = self.merged_at.isoformat()
-        gh_cache.prs[self.number] = d
+        gh_cache.prs[str(self.number)] = d
         gh_cache.save()
 
     def get_commits(self) -> List[CachedCommit]:
-        if self.number in gh_cache.pr_commits:
+        if str(self.number) in gh_cache.pr_commits:
             return [
                 CachedCommit.from_cache(sha)
-                for sha in gh_cache.pr_commits[self.number]
+                for sha in gh_cache.pr_commits[str(self.number)]
             ]
         ret = [
                 CachedCommit.from_gh(c) for c in self.github.get_commits()
             ]
-        gh_cache.pr_commits[self.number] = [cc.sha for cc in ret]
+        gh_cache.pr_commits[str(self.number)] = [cc.sha for cc in ret]
         gh_cache.save()
         return ret
 
