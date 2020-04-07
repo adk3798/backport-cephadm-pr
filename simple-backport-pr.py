@@ -5,7 +5,7 @@ Usage:
   simple-backport-pr.py search
   simple-backport-pr.py crunch options <pr_id>...
   simple-backport-pr.py backport options <pr_id>...
-  simple-backport-pr.py create-backport-pr [--push] options <backport-title> <pr_id>...
+  simple-backport-pr.py create-backport-pr [--no-push] options <backport-title> <pr_id>...
   simple-backport-pr.py -h | --help
 
 Options:
@@ -177,6 +177,13 @@ class CachedPr(NamedTuple):
             d['html_url'] = ''
         return cls(**d)
 
+    @classmethod
+    def from_any(cls, number: int):
+        try:
+            return cls.from_cache(number)
+        except KeyError:
+            return cls.from_gh_pr(ceph_repo().get_pull(number))
+
     def save(self):
         d = self._asdict().copy()
         d['merged_at'] = self.merged_at.isoformat()
@@ -259,7 +266,7 @@ def push_backport_branch(branch_name):
 
 
 def get_prs(pr_ids: List[str]) -> List[CachedPr]:
-    prs = [CachedPr.from_cache(int(pr_id)) for pr_id in pr_ids]
+    prs = [CachedPr.from_any(int(pr_id)) for pr_id in pr_ids]
     for pr in prs:
         pr.validate()
     prs = sorted(prs, key=lambda pr: pr.merged_at)
@@ -304,7 +311,7 @@ def backport(pr_ids: List[str]):
     backport_commits(branch_name, commit_shas)
 
     print('Maybe you now want to run')
-    print(f'{sys.argv[0]} create-backport-pr --push options <backport-title> {" ".join(pr_ids)}')
+    print(f'  {sys.executable} {sys.argv[0]} create-backport-pr <backport-title> {" ".join(pr_ids)}')
 
 def search_prs(g: Github):
     q = {
@@ -318,10 +325,7 @@ def search_prs(g: Github):
     print([issue.number for issue in issues])
     prs = []
     for issue in issues[0:60]:
-        try:
-            prs.append(CachedPr.from_cache(int(issue.number)))
-        except:
-            prs.append(CachedPr.from_gh_pr(issue.as_pull_request()))
+        prs.append(CachedPr.from_any(int(issue.number)))
     print(f'requests remaining: {g._Github__requester.rate_limiting[0]}')
 
 
@@ -384,7 +388,7 @@ if __name__ == '__main__':
         backport(pr_ids=args['<pr_id>'])
 
     if args['create-backport-pr']:
-        main_create_backport_pr(args['--push'],
+        main_create_backport_pr(not args['--no-push'],
                                 args['<pr_id>'],
                                 args['<backport-title>']
                                 )
