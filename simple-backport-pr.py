@@ -4,8 +4,8 @@ Simple workflow for backporting Ceph PRs
 Usage:
   simple-backport-pr.py search
   simple-backport-pr.py crunch options <pr_id>...
-  simple-backport-pr.py backport options <backport-title> <pr_id>...
-  simple-backport-pr.py create-backport-pr [--push] options <backport-title> <pr_id>
+  simple-backport-pr.py backport options <pr_id>...
+  simple-backport-pr.py create-backport-pr [--push] options <backport-title> <pr_id>...
   simple-backport-pr.py -h | --help
 
 Options:
@@ -215,9 +215,10 @@ class CachedPr(NamedTuple):
         _check(not self.merged,
                check_pr_not_merged,
                f'PR not merged: {self.html_url}')
-        _check('https://tracker.ceph.com/issues/' in self.body,
-               check_tracker,
-               f'looks like pr contains a link to the tracker {self.html_url}')
+        if self.body:
+            _check('https://tracker.ceph.com/issues/' in self.body,
+                   check_tracker,
+                   f'looks like pr contains a link to the tracker {self.html_url}')
 
     def get_labels(self):
         labels = [l.name for l in self.github.labels]
@@ -283,7 +284,7 @@ def create_backport_pull_request(milestone: Milestone,
     print(f'Backport PR creted: {backport_pr.html_url}')
 
 
-def backport(pr_ids: List[str], title:str):
+def backport(pr_ids: List[str]):
 
     prs = get_prs(pr_ids)
 
@@ -301,11 +302,9 @@ def backport(pr_ids: List[str], title:str):
     branch_name = get_branch_name(prs)
 
     backport_commits(branch_name, commit_shas)
-    sys.exit()
-    octopus_milestone: Milestone = ceph_repo().get_milestone(13)
-    create_backport_pull_request(octopus_milestone,
-                                 prs,
-                                 title)
+
+    print('Maybe you now want to run')
+    print(f'{sys.argv[0]} create-backport-pr --push options <backport-title> {" ".join(pr_ids)}')
 
 def search_prs(g: Github):
     q = {
@@ -318,7 +317,7 @@ def search_prs(g: Github):
     issues = g.search_issues('', **q)
     print([issue.number for issue in issues])
     prs = []
-    for issue in issues[0:40]:
+    for issue in issues[0:60]:
         try:
             prs.append(CachedPr.from_cache(int(issue.number)))
         except:
@@ -341,7 +340,7 @@ def main_create_backport_pr(push: bool,
                                  prs,
                                  title)
 
-def crunch(g: Github, pr_ids):
+def crunch(pr_ids):
     global _check_silent
     _check_silent = True
     prs = get_prs(pr_ids)
@@ -353,11 +352,13 @@ def crunch(g: Github, pr_ids):
     for pr in prs:
         print(f.format(n=pr.number, t=pr.title, b=str(pr.backported()), at=pr.merged_at.isoformat()))
 
+
 def ceph_repo() -> Repository:
     global _ceph_repo
     if _ceph_repo is None:
         _ceph_repo = g.get_repo('ceph/ceph')
     return _ceph_repo
+
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)
@@ -371,8 +372,8 @@ if __name__ == '__main__':
     with open(f"{os.environ['HOME']}/.github_token") as f:
         token = f.read().strip()
 
-    #g = Github(token)
-    g = Github(token + 'xxx')
+    g = Github(token)
+    #g = Github(token + 'xxx')
     #g = Github()
 
     _ceph_repo = None
@@ -380,9 +381,7 @@ if __name__ == '__main__':
         search_prs(g)
 
     if args['backport']:
-        backport(g,
-                 pr_ids=args['<pr_id>'],
-                 title=args['<backport-title>'])
+        backport(pr_ids=args['<pr_id>'])
 
     if args['create-backport-pr']:
         main_create_backport_pr(args['--push'],
@@ -390,5 +389,5 @@ if __name__ == '__main__':
                                 args['<backport-title>']
                                 )
     if args['crunch']:
-        crunch(g, args['<pr_id>'])
+        crunch(args['<pr_id>'])
 
