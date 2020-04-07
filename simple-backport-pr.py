@@ -266,10 +266,15 @@ def push_backport_branch(branch_name):
 
 
 def get_prs(pr_ids: List[str]) -> List[CachedPr]:
-    prs = [CachedPr.from_any(int(pr_id)) for pr_id in pr_ids]
+    earliest_pr = datetime(2020, 3, 15)
+
+    prs = [CachedPr.from_any(int(pr_id)) for pr_id in pr_ids ]
+    prs = [pr for pr in prs if pr.merged_at > earliest_pr]
+
     for pr in prs:
         pr.validate()
     prs = sorted(prs, key=lambda pr: pr.merged_at)
+
     return prs
 
 
@@ -320,12 +325,24 @@ def search_prs(g: Github):
         'is':'merged',
         'base':'master',
     }
-    print(f'requests remaining: {g._Github__requester.rate_limiting[0]}')
-    issues = g.search_issues('', **q)
+    issues = g.search_issues('', sort='updated', **q)
+    ids = [issue.number for issue in issues[0:80]]
+
+    q = {
+        'repo': 'ceph/ceph',
+        'label':'orchestrator',
+        'is':'merged',
+        'base':'master',
+    }
+    issues = g.search_issues('', sort='updated', **q)
+    ids += [issue.number for issue in issues[0:80]]
+
+
     print([issue.number for issue in issues])
-    prs = []
-    for issue in issues[0:60]:
-        prs.append(CachedPr.from_any(int(issue.number)))
+    prs = [CachedPr.from_any(int(id)) for id in ids]
+
+    print(f'found {len(prs)} issues')
+
     print(f'requests remaining: {g._Github__requester.rate_limiting[0]}')
 
 
