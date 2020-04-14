@@ -258,7 +258,6 @@ def backport_commits(branch_name: str, commits: List[str]):
     check_call("git pull upstream octopus", shell=True)
     check_call(f"git checkout -b {branch_name}", shell=True)
     check_call(f"git cherry-pick -x {commits_str}", shell=True)
-    push_backport_branch(branch_name)
 
 
 def push_backport_branch(branch_name):
