@@ -74,9 +74,14 @@ class GHCache:
         except:
             print(self._content)
             raise
-        with open(self.FNAME, 'w') as f:
-            f.write(c)
 
+        # takes ages to fill the cache. make sure it's not getting corrupted
+        with open(self.FNAME + '.tmp', 'w') as f:
+            f.write(c)
+            f.flush()
+            os.fsync(f.fileno())
+
+        os.rename(self.FNAME + '.tmp', self.FNAME)
 
 
 gh_cache = GHCache()
@@ -154,6 +159,7 @@ class CachedPr(NamedTuple):
     merged: bool
     merged_at: datetime
     html_url: str
+    backported: bool
 
     @classmethod
     def from_gh_pr(cls, gh: PullRequest) -> "CachedPr":
@@ -163,7 +169,8 @@ class CachedPr(NamedTuple):
                 gh.body,
                 gh.merged,
                 gh.merged_at,
-                gh.html_url)
+                gh.html_url,
+                False)
         gh_cache.pull_instances[r.number] = gh
         r.save()
         return r
@@ -175,6 +182,8 @@ class CachedPr(NamedTuple):
         d['merged_at'] = parser.isoparse(d['merged_at'])
         if 'html_url' not in d:
             d['html_url'] = ''
+        if 'backported' not in d:
+            d['backported'] = False
         return cls(**d)
 
     @classmethod
@@ -186,6 +195,10 @@ class CachedPr(NamedTuple):
 
     def save(self):
         d = self._asdict().copy()
+
+        if str(self.number) in gh_cache.prs:
+            d['backported'] = d['backported'] or self.from_cache(self.number).backported
+
         d['merged_at'] = self.merged_at.isoformat()
         gh_cache.prs[str(self.number)] = d
         gh_cache.save()
@@ -207,8 +220,14 @@ class CachedPr(NamedTuple):
 
         return ret
 
-    def backported(self):
-        return all(c.backported for c in self.get_commits())
+    def get_backported(self) -> bool:
+        if self.backported:
+            return True
+        b = all(c.backported for c in self.get_commits())
+        if b:
+            copy = self._replace(backported=True)
+            copy.save()
+        return b
 
 
     @property
@@ -360,7 +379,7 @@ def main_create_backport_pr(push: bool,
                                  prs,
                                  title)
 
-def crunch(pr_ids):
+def crunch(pr_ids: List[str]):
     global _check_silent
     _check_silent = True
     prs = get_prs(pr_ids)
@@ -370,7 +389,7 @@ def crunch(pr_ids):
     f = '{n:<' + str(max_n) + '}  {t:<' + str(max_t) + '} {b:<10} {at:<' + str(max_at) + '}'
     print(f.format(n='NUM', t='TITLE', b='BACKPORTED', at='MERGED AT'))
     for pr in prs:
-        print(f.format(n=pr.number, t=pr.title, b=str(pr.backported()), at=pr.merged_at.isoformat()))
+        print(f.format(n=pr.number, t=pr.title, b=str(pr.get_backported()), at=pr.merged_at.isoformat()))
 
 
 def ceph_repo() -> Repository:
