@@ -262,7 +262,7 @@ def _check(condition, name, description):
 
 
 def get_branch_name(prs: List[CachedPr]) ->  str:
-    return 'octopus-backport-' + '-'.join([str(pr.number) for pr in prs])
+    return 'octopus-backport-' + ('-'.join([str(pr.number) for pr in prs]))[:70]
 
 
 def backport_commits(branch_name: str, commits: List[str]):
