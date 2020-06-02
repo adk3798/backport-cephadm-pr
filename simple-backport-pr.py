@@ -278,6 +278,18 @@ def backport_commits(branch_name: str, commits: List[str]):
     check_call(f"git checkout -b {branch_name}", shell=True)
     check_call(f"git cherry-pick -x {commits_str}", shell=True)
 
+def order_commit_shas(commit_shas: List[str]):
+    out = check_output(f"git rev-list --topo-order {' '.join(commit_shas)}", shell=True)
+    commit_shas_set = set(commit_shas)
+    lines = out.decode().splitlines()
+    ret = [
+        l.strip()
+        for l in lines
+        if l.strip() in commit_shas_set
+    ]
+    assert len(ret) == len(commit_shas), (len(ret), len(commit_shas))
+    ret.reverse()
+    return ret
 
 def push_backport_branch(branch_name):
     check_call(f"git push --set-upstream origin {branch_name}", shell=True)
@@ -328,6 +340,8 @@ def backport(pr_ids: List[str]):
         _check(c.backported, commit_not_merged, "Commit already in current branch")
 
     commit_shas = [c.sha for c in commits]
+
+    commit_shas = order_commit_shas(commit_shas)
 
     branch_name = get_branch_name(prs)
 
