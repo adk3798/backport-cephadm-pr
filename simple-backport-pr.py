@@ -33,8 +33,16 @@ check_pr_not_merged = 'pr-not-merged'
 check_tracker = 'tracker'
 commit_not_merged = 'commit-not-merged'
 
+def get_current_branch_name() -> str:
+    current_branch = check_output('git symbolic-ref --short HEAD', shell=True).decode().strip()
+    assert current_branch in 'octoups pacific'.split()
+    return current_branch
+
+base_branch_name = get_current_branch_name()
+
+
 class GHCache:
-    FNAME = os.path.expanduser('~/.simple-backport-pr.cache.json')
+    FNAME = os.path.expanduser(f'~/.simple-backport-pr{"-" + base_branch_name if base_branch_name != "octopus" else ""}.cache.json')
 
     def __init__(self):
         try:
@@ -123,7 +131,7 @@ class CachedCommit(NamedTuple):
                 'maybe helps: $ git checkout master && git pull upstream master && git checkout -')
             raise
         #print(f'already in branches {in_branches}')
-        if 'octopus' in in_branches:
+        if base_branch_name in in_branches:
             return True
 
         msg = self.message
@@ -262,19 +270,16 @@ def _check(condition, name, description):
 
 
 def get_branch_name(prs: List[CachedPr]) ->  str:
-    return 'octopus-backport-' + ('-'.join([str(pr.number) for pr in prs]))[:70]
+    return f'{base_branch_name}-backport-' + ('-'.join([str(pr.number) for pr in prs]))[:70]
 
 
 def backport_commits(branch_name: str, commits: List[str]):
 
-    print(f"git cherry-pick --abort ; git reset --hard HEAD && git checkout octopus && git branch -D {branch_name}")
-    
-    current_branch = check_output('git symbolic-ref --short HEAD', shell=True).decode().strip()
-    assert current_branch == 'octopus', current_branch
+    print(f"git cherry-pick --abort ; git reset --hard HEAD && git checkout {base_branch_name} && git branch -D {branch_name}")
 
     commits_str = ' '.join(c for c in commits)
 
-    check_call("git pull upstream octopus", shell=True)
+    check_call(f"git pull upstream {base_branch_name}", shell=True)
     check_call(f"git checkout -b {branch_name}", shell=True)
     check_call(f"git cherry-pick -x {commits_str}", shell=True)
 
@@ -313,11 +318,11 @@ def create_backport_pull_request(milestone: Milestone,
                                  title):
     numberstr = ', '.join(f'#{pr.number}' for pr in prs)
     body = f"Backport of {numberstr}"
-    assert 'octopus' not in title
+    assert base_branch_name not in title
     backport_pr: PullRequest = ceph_repo().create_pull(
-        title='octopus: ' + title,
+        title=f'{base_branch_name}: ' + title,
         body=body,
-        base='octopus',
+        base=base_branch_name,
         head=f'sebastian-philipp:{get_branch_name(prs)}',
     )
     labels = set(sum([pr.get_labels() for pr in prs], []))
@@ -357,6 +362,10 @@ def search_prs(g: Github):
         'is':'merged',
         'base':'master',
     }
+    if base_branch_name == 'pacific':
+        q['created'] = '>2021-01-10'
+    else:
+        assert False
     issues = g.search_issues('', sort='updated', **q)
     ids = [issue.number for issue in issues[0:80]]
 
@@ -366,6 +375,10 @@ def search_prs(g: Github):
         'is':'merged',
         'base':'master',
     }
+    if base_branch_name == 'pacific':
+        q['created'] = '>2020-12-01'
+    else:
+        assert False
     issues = g.search_issues('', sort='updated', **q)
     ids += [issue.number for issue in issues[0:80]]
 
@@ -388,8 +401,8 @@ def main_create_backport_pr(push: bool,
 
     if push:
         push_backport_branch(get_branch_name(prs))
-    octopus_milestone: Milestone = ceph_repo().get_milestone(13)
-    create_backport_pull_request(octopus_milestone,
+    github_milestone: Milestone = ceph_repo().get_milestone(13)
+    create_backport_pull_request(github_milestone,
                                  prs,
                                  title)
 
