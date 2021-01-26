@@ -35,7 +35,6 @@ commit_not_merged = 'commit-not-merged'
 
 def get_current_branch_name() -> str:
     current_branch = check_output('git symbolic-ref --short HEAD', shell=True).decode().strip()
-    assert current_branch in 'octoups pacific'.split()
     return current_branch
 
 base_branch_name = get_current_branch_name()
@@ -444,9 +443,13 @@ if __name__ == '__main__':
 
     _ceph_repo = None
     if args['search']:
+        assert base_branch_name in 'octoups pacific'.split()
+
         search_prs(g)
 
     if args['backport']:
+        assert base_branch_name in 'octoups pacific'.split()
+
         backport(pr_ids=args['<pr_id>'])
 
     if args['create-backport-pr']:
@@ -455,5 +458,7 @@ if __name__ == '__main__':
                                 args['<backport-title>']
                                 )
     if args['crunch']:
+        assert base_branch_name in 'octoups pacific'.split()
+
         crunch(args['<pr_id>'])
 
