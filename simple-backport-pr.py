@@ -5,7 +5,7 @@ Usage:
   simple-backport-pr.py search
   simple-backport-pr.py crunch options [<pr_id>...]
   simple-backport-pr.py backport options <pr_id>...
-  simple-backport-pr.py create-backport-pr [--no-push] options <backport-title> <pr_id>...
+  simple-backport-pr.py create-backport-pr [--no-push] options <backport-title> <base-branch-name> <pr_id>...
   simple-backport-pr.py -h | --help
 
 Options:
@@ -269,7 +269,7 @@ def _check(condition, name, description):
 
 
 def get_branch_name(prs: List[CachedPr]) ->  str:
-    return f'{base_branch_name}-backport-' + ('-'.join([str(pr.number) for pr in prs]))[:70]
+    return f'{base_branch_name}-backport-' + ('-'.join([str(pr.number) for pr in prs]))[:60]
 
 
 def backport_commits(branch_name: str, commits: List[str]):
@@ -457,6 +457,8 @@ if __name__ == '__main__':
         backport(pr_ids=args['<pr_id>'])
 
     if args['create-backport-pr']:
+        base_branch_name = args['<base-branch-name>']
+        assert base_branch_name in 'octoups pacific'.split(), f'base-branch-name must be octopus or pacific'
         main_create_backport_pr(not args['--no-push'],
                                 args['<pr_id>'],
                                 args['<backport-title>']
