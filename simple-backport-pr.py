@@ -357,27 +357,22 @@ def backport(pr_ids: List[str]):
 def search_prs(g: Github):
     q = {
         'repo': 'ceph/ceph',
-        'label':'cephadm',
-        'is':'merged',
-        'base':'master',
+        'label': 'cephadm',
+        'is': 'merged',
+        'base': 'master',
+        'created': '>2020-12-01'
     }
-    if base_branch_name == 'pacific':
-        q['created'] = '>2021-01-10'
-    else:
-        assert False
     issues = g.search_issues('', sort='updated', **q)
     ids = [issue.number for issue in issues[0:80]]
 
     q = {
         'repo': 'ceph/ceph',
         'label':'orchestrator',
-        'is':'merged',
-        'base':'master',
+        'is': 'merged',
+        'base': 'master',
+        'created': '>2020-12-01'
     }
-    if base_branch_name == 'pacific':
-        q['created'] = '>2020-12-01'
-    else:
-        assert False
+
     issues = g.search_issues('', sort='updated', **q)
     ids += [issue.number for issue in issues[0:80]]
 
@@ -447,24 +442,24 @@ if __name__ == '__main__':
 
     _ceph_repo = None
     if args['search']:
-        assert base_branch_name in 'octoups pacific'.split()
+        assert base_branch_name in 'octopus pacific'.split()
 
         search_prs(g)
 
     if args['backport']:
-        assert base_branch_name in 'octoups pacific'.split()
+        assert base_branch_name in 'octopus pacific'.split()
 
         backport(pr_ids=args['<pr_id>'])
 
     if args['create-backport-pr']:
         base_branch_name = args['<base-branch-name>']
-        assert base_branch_name in 'octoups pacific'.split(), f'base-branch-name must be octopus or pacific'
+        assert base_branch_name in 'octopus pacific'.split(), f'base-branch-name must be octopus or pacific'
         main_create_backport_pr(not args['--no-push'],
                                 args['<pr_id>'],
                                 args['<backport-title>']
                                 )
     if args['crunch']:
-        assert base_branch_name in 'octoups pacific'.split()
+        assert base_branch_name in 'octopus pacific'.split()
 
         crunch(args['<pr_id>'])
 
