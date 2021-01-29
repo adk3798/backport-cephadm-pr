@@ -3,7 +3,7 @@ Simple workflow for backporting Ceph PRs
 
 Usage:
   simple-backport-pr.py search
-  simple-backport-pr.py crunch options <pr_id>...
+  simple-backport-pr.py crunch options [<pr_id>...]
   simple-backport-pr.py backport options <pr_id>...
   simple-backport-pr.py create-backport-pr [--no-push] options <backport-title> <pr_id>...
   simple-backport-pr.py -h | --help
@@ -408,6 +408,10 @@ def main_create_backport_pr(push: bool,
 def crunch(pr_ids: List[str]):
     global _check_silent
     _check_silent = True
+
+    if not pr_ids:
+        pr_ids = list(gh_cache.prs.keys())
+
     prs = get_prs(pr_ids)
     max_n = max(len(str(pr.number)) for pr in prs)
     max_t = max(len(str(pr.title)) for pr in prs)

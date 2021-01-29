@@ -1,8 +1,23 @@
 # simple-backport-pr
 
-this is a simple script
+Simple workflow for backporting Ceph PRs
 
 ## usage
+
+```
+Usage:
+  simple-backport-pr.py search
+  simple-backport-pr.py crunch options [<pr_id>...]
+  simple-backport-pr.py backport options <pr_id>...
+  simple-backport-pr.py create-backport-pr [--no-push] options <backport-title> <pr_id>...
+  simple-backport-pr.py -h | --help
+
+Options:
+  --ignore-pr-not-merged
+  --ignore-tracker
+  -h --help                Show this screen.
+```
+
 
 ### search for issues:
 
@@ -19,5 +34,5 @@ python ~/src/simple-backport-ceph/simple-backport-pr.py search
 cd src/ceph ;
 git checkout master ; git pull upstream master 
 git checkout pacific ; git pull upstream pacific
- cat ~/.simple-backport-pr-pacific.cache.json | jq '.prs[].number' | xargs  python ~/src/simple-backport-ceph/simple-backport-pr.py crunch --ignore-tracker
+python ~/src/simple-backport-ceph/simple-backport-pr.py crunch --ignore-tracker
 ```
