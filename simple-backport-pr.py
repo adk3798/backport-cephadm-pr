@@ -10,6 +10,7 @@ Usage:
 
 Options:
   --ignore-pr-not-merged
+  --ignore-commit-not-merged
   --ignore-tracker
   -h --help                Show this screen.
 """
@@ -341,7 +342,7 @@ def backport(pr_ids: List[str]):
             commits.append(c)
 
     for c in commits:
-        _check(c.backported, commit_not_merged, "Commit already in current branch")
+        _check(c.backported, commit_not_merged, f"Commit {c.sha} already in current branch")
 
     commit_shas = [c.sha for c in commits]
 
@@ -360,7 +361,7 @@ def search_prs(g: Github):
         'label': 'cephadm',
         'is': 'merged',
         'base': 'master',
-        'created': '>2020-12-01'
+        'created': '>2020-10-19'
     }
     issues = g.search_issues('', sort='updated', **q)
     ids = [issue.number for issue in issues[0:80]]
@@ -370,7 +371,7 @@ def search_prs(g: Github):
         'label':'orchestrator',
         'is': 'merged',
         'base': 'master',
-        'created': '>2020-12-01'
+        'created': '>2020-10-19'
     }
 
     issues = g.search_issues('', sort='updated', **q)
@@ -430,6 +431,8 @@ if __name__ == '__main__':
     disabled_checks = set()
     if args['--ignore-pr-not-merged']:
         disabled_checks.add(check_pr_not_merged)
+    if args['--ignore-commit-not-merged']:
+        disabled_checks.add(commit_not_merged)
     if args['--ignore-tracker']:
         disabled_checks.add(check_tracker)
 
