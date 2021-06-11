@@ -266,7 +266,7 @@ def _check(condition, name, description):
         else:
             if not _check_silent:
                 print(f'check failed: {description} [--ignore-{name}]')
-            sys.exit(3)
+                sys.exit(3)
 
 
 def get_branch_name(prs: List[CachedPr]) ->  str:
