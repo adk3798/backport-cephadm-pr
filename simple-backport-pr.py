@@ -2,24 +2,25 @@
 Simple workflow for backporting Ceph PRs
 
 Usage:
-  simple-backport-pr.py search
-  simple-backport-pr.py crunch options [<pr_id>...]
-  simple-backport-pr.py backport options <pr_id>...
-  simple-backport-pr.py create-backport-pr [--no-push] options <backport-title> <base-branch-name> <pr_id>...
+  simple-backport-pr.py [--label=label] search
+  simple-backport-pr.py [--label=label] crunch options [<pr_id>...]
+  simple-backport-pr.py [--label=label] backport options <pr_id>...
+  simple-backport-pr.py [--label=label] create-backport-pr [--no-push] options <backport-title> <base-branch-name> <pr_id>...
   simple-backport-pr.py -h | --help
 
 Options:
   --ignore-pr-not-merged
   --ignore-commit-not-merged
   --ignore-tracker
-  -h --help                Show this screen.
+  --label=label              GH labels
+  -h --help                  Show this screen.
 """
 import json
 from datetime import datetime
 from subprocess import check_call, check_output, CalledProcessError
 import os
 import sys
-from typing import List, Tuple, NamedTuple, Dict, Optional
+from typing import List, Tuple, NamedTuple, Dict, Optional, OrderedDict
 
 from dateutil import parser
 from github import Github
@@ -40,13 +41,24 @@ def get_current_branch_name() -> str:
 
 base_branch_name = get_current_branch_name()
 
+default_labels = 'cephadm orchestrator'.split()
+labels: List[str] = []
+
 
 class GHCache:
-    FNAME = os.path.expanduser(f'~/.simple-backport-pr{"-" + base_branch_name if base_branch_name != "octopus" else ""}.cache.json')
+    @staticmethod
+    def _fname():
+        suffixes = ''
+        if base_branch_name != "octopus":
+            suffixes += "-" + base_branch_name
+        if labels != default_labels:
+            suffixes += '-' + ','.join(sorted(labels))
+        ret = os.path.expanduser(f'~/.simple-backport-pr{suffixes}.cache.json')
+        return ret
 
     def __init__(self):
         try:
-            with open(self.FNAME) as f:
+            with open(self._fname()) as f:
                 self._content: dict = json.load(f)
         except FileNotFoundError:
             self._content = {}
@@ -84,15 +96,13 @@ class GHCache:
             raise
 
         # takes ages to fill the cache. make sure it's not getting corrupted
-        with open(self.FNAME + '.tmp', 'w') as f:
+        with open(self._fname() + '.tmp', 'w') as f:
             f.write(c)
             f.flush()
             os.fsync(f.fileno())
 
-        os.rename(self.FNAME + '.tmp', self.FNAME)
+        os.rename(self._fname() + '.tmp', self._fname())
 
-
-gh_cache = GHCache()
 
 class CachedCommit(NamedTuple):
     sha: str
@@ -256,7 +266,7 @@ class CachedPr(NamedTuple):
 
     def get_labels(self):
         labels = [l.name for l in self.github.labels]
-        return [l for l in 'cephadm orchestrator mgr documentation'.split() if l in labels]
+        return [l for l in 'cephadm orchestrator rook mgr documentation'.split() if l in labels]
 
 _check_silent = False
 def _check(condition, name, description):
@@ -355,31 +365,25 @@ def backport(pr_ids: List[str]):
     print('Maybe you now want to run')
     print(f'  {sys.executable} {sys.argv[0]} create-backport-pr <backport-title> {" ".join(pr_ids)}')
 
-def search_prs(g: Github):
+
+def search_prs_label(g: Github, label: str) -> List[int]:
     q = {
         'repo': 'ceph/ceph',
-        'label': 'cephadm',
+        'label': label,
         'is': 'merged',
         'base': 'master',
         'created': '>2020-10-19'
     }
     issues = g.search_issues('', sort='updated', **q)
     ids = [issue.number for issue in issues[0:80]]
-
-    q = {
-        'repo': 'ceph/ceph',
-        'label':'orchestrator',
-        'is': 'merged',
-        'base': 'master',
-        'created': '>2020-10-19'
-    }
-
-    issues = g.search_issues('', sort='updated', **q)
-    ids += [issue.number for issue in issues[0:80]]
+    print(f'found for label {label}: {ids}')
+    return ids
 
 
-    print([issue.number for issue in issues])
-    prs = [CachedPr.from_any(int(id)) for id in ids]
+def search_prs(g: Github):
+    ids = set(sum([search_prs_label(g, l) for l in labels], []))
+
+    prs = [CachedPr.from_any(id) for id in ids]
 
     print(f'found {len(prs)} issues')
 
@@ -435,6 +439,13 @@ if __name__ == '__main__':
         disabled_checks.add(commit_not_merged)
     if args['--ignore-tracker']:
         disabled_checks.add(check_tracker)
+    if args['--label']:
+        labels = args['--label'].split(',')
+    else:
+        labels = default_labels
+    assert labels, 'labels cannot be empty'
+
+    gh_cache = GHCache()
 
     with open(f"{os.environ['HOME']}/.github_token") as f:
         token = f.read().strip()
