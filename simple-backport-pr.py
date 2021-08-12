@@ -11,6 +11,7 @@ Usage:
 Options:
   --ignore-pr-not-merged
   --ignore-commit-not-merged
+  --ignore-order-commit-shas-non-equal
   --ignore-tracker
   --label=label              GH labels
   -h --help                  Show this screen.
@@ -34,6 +35,7 @@ import docopt
 check_pr_not_merged = 'pr-not-merged'
 check_tracker = 'tracker'
 commit_not_merged = 'commit-not-merged'
+order_commit_shas_non_equal = 'order-commit-shas-non-equal'
 
 def get_current_branch_name() -> str:
     current_branch = check_output('git symbolic-ref --short HEAD', shell=True).decode().strip()
@@ -302,7 +304,10 @@ def order_commit_shas(commit_shas: List[str]):
         for l in lines
         if l.strip() in commit_shas_set
     ]
-    assert len(ret) == len(commit_shas), (len(ret), len(commit_shas))
+    _check(len(ret) != len(commit_shas_set),
+           order_commit_shas_non_equal,
+           f'order_commit_shas: dropping commits: {set(commit_shas) - set(ret)}, adding commits: {set(ret) - commit_shas_set}')
+
     ret.reverse()
     return ret
 
@@ -439,6 +444,8 @@ if __name__ == '__main__':
         disabled_checks.add(commit_not_merged)
     if args['--ignore-tracker']:
         disabled_checks.add(check_tracker)
+    if args['--ignore-order-commit-shas-non-equal']:
+        disabled_checks.add(order_commit_shas_non_equal)
     if args['--label']:
         labels = args['--label'].split(',')
     else:
