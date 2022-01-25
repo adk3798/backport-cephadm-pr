@@ -316,7 +316,7 @@ def push_backport_branch(branch_name):
 
 
 def get_prs(pr_ids: List[str]) -> List[CachedPr]:
-    earliest_pr = datetime(2020, 3, 15)
+    earliest_pr = datetime(2021, 3, 15)
 
     prs = [CachedPr.from_any(int(pr_id)) for pr_id in pr_ids ]
     prs = [pr for pr in prs if pr.merged_at > earliest_pr]
@@ -377,7 +377,7 @@ def search_prs_label(g: Github, label: str) -> List[int]:
         'label': label,
         'is': 'merged',
         'base': 'master',
-        'created': '>2020-10-19'
+        'created': '>2021-10-19'
     }
     issues = g.search_issues('', sort='updated', **q)
     ids = [issue.number for issue in issues[0:80]]
@@ -463,24 +463,24 @@ if __name__ == '__main__':
 
     _ceph_repo = None
     if args['search']:
-        assert base_branch_name in 'octopus pacific'.split()
+        assert base_branch_name in 'octopus pacific quincy'.split()
 
         search_prs(g)
 
     if args['backport']:
-        assert base_branch_name in 'octopus pacific'.split()
+        assert base_branch_name in 'octopus pacific quincy'.split()
 
         backport(pr_ids=args['<pr_id>'])
 
     if args['create-backport-pr']:
         base_branch_name = args['<base-branch-name>']
-        assert base_branch_name in 'octopus pacific'.split(), f'base-branch-name must be octopus or pacific'
+        assert base_branch_name in 'octopus pacific quincy'.split(), f'base-branch-name must be octopus or pacific or quincy'
         main_create_backport_pr(not args['--no-push'],
                                 args['<pr_id>'],
                                 args['<backport-title>']
                                 )
     if args['crunch']:
-        assert base_branch_name in 'octopus pacific'.split()
+        assert base_branch_name in 'octopus pacific quincy'.split()
 
         crunch(args['<pr_id>'])
 
