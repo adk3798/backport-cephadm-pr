@@ -140,7 +140,7 @@ class CachedCommit(NamedTuple):
             ]
         except CalledProcessError:
             print(
-                'maybe helps: $ git checkout master && git pull upstream master && git checkout -')
+                'maybe helps: $ git checkout main && git pull upstream main && git checkout -')
             raise
         #print(f'already in branches {in_branches}')
         if base_branch_name in in_branches:
@@ -371,22 +371,25 @@ def backport(pr_ids: List[str]):
     print(f'  {sys.executable} {sys.argv[0]} create-backport-pr <backport-title> {" ".join(pr_ids)}')
 
 
-def search_prs_label(g: Github, label: str) -> List[int]:
+def search_prs_label(g: Github, label: str, base: str, created: str) -> List[int]:
     q = {
         'repo': 'ceph/ceph',
         'label': label,
         'is': 'merged',
-        'base': 'master',
-        'created': '>2021-10-19'
+        'base': base,
+        'created': created,
     }
     issues = g.search_issues('', sort='updated', **q)
-    ids = [issue.number for issue in issues[0:80]]
-    print(f'found for label {label}: {ids}')
+    ids: List[int] = []
+    if issues.totalCount:
+        ids = [issue.number for issue in issues[0:80]]
+    print(f'found for label {label}: {ids} on branch: {base}')
     return ids
 
 
 def search_prs(g: Github):
-    ids = set(sum([search_prs_label(g, l) for l in labels], []))
+    ids = set(sum([search_prs_label(g, l, 'master', '>2021-10-19') for l in labels], []))
+    ids = ids.union(set(sum([search_prs_label(g, l, 'main', '>2022-05-20') for l in labels], [])))
 
     prs = [CachedPr.from_any(id) for id in ids]
 
@@ -463,24 +466,24 @@ if __name__ == '__main__':
 
     _ceph_repo = None
     if args['search']:
-        assert base_branch_name in 'octopus pacific quincy'.split()
+        assert base_branch_name in 'pacific quincy reef squid'.split()
 
         search_prs(g)
 
     if args['backport']:
-        assert base_branch_name in 'octopus pacific quincy'.split()
+        assert base_branch_name in 'pacific quincy reef squid'.split()
 
         backport(pr_ids=args['<pr_id>'])
 
     if args['create-backport-pr']:
         base_branch_name = args['<base-branch-name>']
-        assert base_branch_name in 'octopus pacific quincy'.split(), f'base-branch-name must be octopus or pacific or quincy'
+        assert base_branch_name in 'pacific quincy reef squid'.split(), f'base-branch-name must be pacific, quincy, reef or squid'
         main_create_backport_pr(not args['--no-push'],
                                 args['<pr_id>'],
                                 args['<backport-title>']
                                 )
     if args['crunch']:
-        assert base_branch_name in 'octopus pacific quincy'.split()
+        assert base_branch_name in 'pacific quincy reef squid'.split()
 
         crunch(args['<pr_id>'])
 
